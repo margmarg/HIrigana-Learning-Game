@@ -1,4 +1,4 @@
-# Hiragana Tiles Game
+# Hiragana Learning Game
 
 A web-based memory matching game designed to help learn Japanese Hiragana characters. Inspired by the New York Times Tiles game, this version uses Hiragana characters to make learning Japanese writing more engaging and fun.
 
@@ -23,8 +23,8 @@ A web-based memory matching game designed to help learn Japanese Hiragana charac
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/hiragana-tiles.git
-cd hiragana-tiles
+git clone https://github.com/margmarg/Hiragana-Learning-Game.git
+cd Hiragana-Learning-Game
 ```
 
 2. Install dependencies:

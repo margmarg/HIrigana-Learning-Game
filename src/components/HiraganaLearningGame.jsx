@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const HiraganaTiles = () => {
+const HiraganaLearningGame = () => {
   const hiraganaData = [
     { char: 'あ', romaji: 'a' },
     { char: 'い', romaji: 'i' },
@@ -19,7 +19,6 @@ const HiraganaTiles = () => {
     { char: 'そ', romaji: 'so' }
   ];
 
-  // Fix: Added japaneseVoice state
   const [japaneseVoice, setJapaneseVoice] = useState(null);
   const [tiles, setTiles] = useState([]);
   const [selectedTiles, setSelectedTiles] = useState([]);
@@ -28,23 +27,17 @@ const HiraganaTiles = () => {
   const [moves, setMoves] = useState(0);
 
   useEffect(() => {
-    // Initialize speech synthesis and find preferred Japanese voice
     const initializeSpeech = () => {
       const voices = window.speechSynthesis.getVoices();
-      
-      // Try to find a female Japanese voice first
       let jaVoice = voices.find(voice => 
         voice.lang.startsWith('ja') && 
         voice.name.toLowerCase().includes('female')
       );
-      
-      // If no female voice found, fall back to any Japanese voice
       if (!jaVoice) {
         jaVoice = voices.find(voice => voice.lang.startsWith('ja'));
       }
-      
       if (jaVoice) {
-        console.log('Selected voice:', jaVoice.name); // For debugging
+        console.log('Selected voice:', jaVoice.name);
         setJapaneseVoice(jaVoice);
       }
     };
@@ -57,29 +50,22 @@ const HiraganaTiles = () => {
 
     initializeGame();
 
-    // Cleanup function to cancel any ongoing speech when component unmounts
     return () => {
       window.speechSynthesis.cancel();
     };
   }, []);
 
   const speak = (char) => {
-    const hiragana = hiraganaData.find(h => h.char === char);
-    if (!hiragana) return;
-
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(char);
     if (japaneseVoice) {
       utterance.voice = japaneseVoice;
     }
     utterance.lang = 'ja-JP';
-    utterance.rate = 0.6;    // Slower speed
-    utterance.pitch = 1.3;   // Higher pitch
-    utterance.volume = 1.0;  // Maximum volume
+    utterance.rate = 0.6;
+    utterance.pitch = 1.3;
+    utterance.volume = 1.0;
 
-    // Add a small delay before speaking
     setTimeout(() => {
       window.speechSynthesis.speak(utterance);
     }, 50);
@@ -113,7 +99,6 @@ const HiraganaTiles = () => {
       return;
     }
 
-    // Speak the character when clicked
     speak(tile.content);
 
     const newSelected = [...selectedTiles, tile];
@@ -205,4 +190,4 @@ const HiraganaTiles = () => {
   );
 };
 
-export default HiraganaTiles;
+export default HiraganaLearningGame;
