@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 const HiraganaLearningGame = () => {
   const hiraganaData = [
@@ -19,56 +19,71 @@ const HiraganaLearningGame = () => {
     { char: 'そ', romaji: 'so' }
   ];
 
-  const [japaneseVoice, setJapaneseVoice] = useState(null);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('elevenLabsApiKey') || '');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(!apiKey);
+  const [selectedVoiceId, setSelectedVoiceId] = useState(
+    localStorage.getItem('elevenLabsVoiceId') || '3JDquces8E8bkmvbh6Bc'
+  );
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [tiles, setTiles] = useState([]);
   const [selectedTiles, setSelectedTiles] = useState([]);
   const [matchedPairs, setMatchedPairs] = useState([]);
   const [mismatchedPairs, setMismatchedPairs] = useState([]);
   const [moves, setMoves] = useState(0);
 
-  useEffect(() => {
-    const initializeSpeech = () => {
-      const voices = window.speechSynthesis.getVoices();
-      let jaVoice = voices.find(voice => 
-        voice.lang.startsWith('ja') && 
-        voice.name.toLowerCase().includes('female')
+  const speak = async (text) => {
+    if (!apiKey || !selectedVoiceId || isLoading) {
+      console.log('Checking values:', { apiKey, selectedVoiceId, isLoading });
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,
+        {
+          method: 'POST',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text,
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: {
+              stability: 1.0,
+              similarity_boost: 1.0
+            }
+          }),
+        }
       );
-      if (!jaVoice) {
-        jaVoice = voices.find(voice => voice.lang.startsWith('ja'));
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`API Error: ${response.status} - ${errorData.detail?.message || errorData.detail || 'Unknown error'}`);
       }
-      if (jaVoice) {
-        console.log('Selected voice:', jaVoice.name);
-        setJapaneseVoice(jaVoice);
-      }
-    };
 
-    if (window.speechSynthesis.getVoices().length) {
-      initializeSpeech();
-    } else {
-      window.speechSynthesis.onvoiceschanged = initializeSpeech;
+      const audioBlob = await response.blob();
+      const audio = new Audio(URL.createObjectURL(audioBlob));
+      await audio.play();
+    } catch (error) {
+      console.error('TTS error:', error);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    initializeGame();
+  const handleApiSubmit = (e) => {
+    e.preventDefault();
+    localStorage.setItem('elevenLabsApiKey', apiKey);
+    setIsApiKeyModalOpen(false);
+  };
 
-    return () => {
-      window.speechSynthesis.cancel();
-    };
-  }, []);
-
-  const speak = (char) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(char);
-    if (japaneseVoice) {
-      utterance.voice = japaneseVoice;
-    }
-    utterance.lang = 'ja-JP';
-    utterance.rate = 0.6;
-    utterance.pitch = 1.3;
-    utterance.volume = 1.0;
-
-    setTimeout(() => {
-      window.speechSynthesis.speak(utterance);
-    }, 50);
+  const handleClearApi = () => {
+    localStorage.removeItem('elevenLabsApiKey');
+    setApiKey('');
+    setIsApiKeyModalOpen(true);
   };
 
   const initializeGame = () => {
@@ -93,6 +108,10 @@ const HiraganaLearningGame = () => {
     setMismatchedPairs([]);
     setMoves(0);
   };
+
+  useEffect(() => {
+    initializeGame();
+  }, []);
 
   const handleTileClick = (tile) => {
     if (selectedTiles.length === 2 || selectedTiles.includes(tile) || matchedPairs.includes(tile.id)) {
@@ -122,8 +141,71 @@ const HiraganaLearningGame = () => {
 
   return (
     <div style={{ maxWidth: '800px', margin: '20px auto', padding: '20px' }} className="bg-white rounded-lg shadow-lg">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      {isApiKeyModalOpen && (
+        <div style={{
+          marginBottom: '20px',
+          padding: '20px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '8px'
+        }}>
+          <form onSubmit={handleApiSubmit}>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Enter ElevenLabs API Key"
+              style={{
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #e2e8f0',
+                marginRight: '10px',
+                width: '300px'
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#4f46e5',
+                color: 'white',
+                borderRadius: '4px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Save API Key
+            </button>
+          </form>
+        </div>
+      )}
+
+      {!isApiKeyModalOpen && (
+        <button
+          onClick={handleClearApi}
+          style={{
+            marginBottom: '10px',
+            padding: '4px 8px',
+            fontSize: '12px',
+            backgroundColor: '#f1f5f9',
+            border: '1px solid #e2e8f0',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Clear API Key
+        </button>
+      )}
+
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+        gap: '10px'
+      }}>
         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>Moves: {moves}</div>
+        
         <button 
           style={{ 
             padding: '10px 20px',
@@ -190,4 +272,4 @@ const HiraganaLearningGame = () => {
   );
 };
 
-export default HiraganaLearningGame;
+export default HiraganaLearningGame;  
