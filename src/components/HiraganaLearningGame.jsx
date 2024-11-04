@@ -1,22 +1,20 @@
 import { useState, useEffect } from 'react';
 
 const HiraganaLearningGame = () => {
-  const hiraganaData = [
-    { char: 'あ', romaji: 'a' },
-    { char: 'い', romaji: 'i' },
-    { char: 'う', romaji: 'u' },
-    { char: 'え', romaji: 'e' },
-    { char: 'お', romaji: 'o' },
-    { char: 'か', romaji: 'ka' },
-    { char: 'き', romaji: 'ki' },
-    { char: 'く', romaji: 'ku' },
-    { char: 'け', romaji: 'ke' },
-    { char: 'こ', romaji: 'ko' },
-    { char: 'さ', romaji: 'sa' },
-    { char: 'し', romaji: 'shi' },
-    { char: 'す', romaji: 'su' },
-    { char: 'せ', romaji: 'se' },
-    { char: 'そ', romaji: 'so' }
+  const initialHiragana = [
+    { hiragana: 'マ', romaji: 'ma' },
+    { hiragana: 'ー', romaji: '-' },
+    { hiragana: 'ガ', romaji: 'ga' },
+    { hiragana: 'レ', romaji: 're' },
+    { hiragana: 'ッ', romaji: 'tt' },
+    { hiragana: 'ト', romaji: 'to' },
+    { hiragana: 'ミ', romaji: 'mi' },
+    { hiragana: 'ン', romaji: 'n' },
+    { hiragana: 'ス', romaji: 'su' },
+    { hiragana: 'キ', romaji: 'ki' },
+    { hiragana: 'コ', romaji: 'ko' },
+    { hiragana: 'お', romaji: 'o' },
+    { hiragana: 'あ', romaji: 'a' },
   ];
 
   const [apiKey, setApiKey] = useState(localStorage.getItem('elevenLabsApiKey') || '');
@@ -31,15 +29,27 @@ const HiraganaLearningGame = () => {
   const [matchedPairs, setMatchedPairs] = useState([]);
   const [mismatchedPairs, setMismatchedPairs] = useState([]);
   const [moves, setMoves] = useState(0);
+  const [japaneseVoices, setJapaneseVoices] = useState([]);
 
   const speak = async (text) => {
-    if (!apiKey || !selectedVoiceId || isLoading) {
-      console.log('Checking values:', { apiKey, selectedVoiceId, isLoading });
+    if (!apiKey || !selectedVoiceId || isLoading) return;
+    if (!text) {
+      console.error('No text provided to speak');
       return;
     }
     
     setIsLoading(true);
     try {
+      const requestBody = {
+        text: text,
+        model_id: "eleven_turbo_v2_5",
+        language_code: "ja",
+        voice_settings: {
+          stability: 1.0,
+          similarity_boost: 1.0
+        }
+      };
+
       const response = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,
         {
@@ -48,20 +58,14 @@ const HiraganaLearningGame = () => {
             'xi-api-key': apiKey,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            text,
-            model_id: 'eleven_multilingual_v2',
-            voice_settings: {
-              stability: 1.0,
-              similarity_boost: 1.0
-            }
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`API Error: ${response.status} - ${errorData.detail?.message || errorData.detail || 'Unknown error'}`);
+        console.error('Full error response:', errorData);
+        throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
 
       const audioBlob = await response.blob();
@@ -87,13 +91,13 @@ const HiraganaLearningGame = () => {
   };
 
   const initializeGame = () => {
-    const gameChars = [...hiraganaData]
+    const gameChars = [...initialHiragana]
       .sort(() => Math.random() - 0.5)
       .slice(0, 12);
     
     const allTiles = [...gameChars, ...gameChars, gameChars[0]].map((char, index) => ({
-      id: `${char.char}-${index}`,
-      content: char.char,
+      id: `${char.hiragana}-${index}`,
+      content: char.hiragana,
       romaji: char.romaji
     }));
     
@@ -113,12 +117,56 @@ const HiraganaLearningGame = () => {
     initializeGame();
   }, []);
 
+  useEffect(() => {
+    const fetchVoices = async () => {
+      if (!apiKey) return;
+      
+      try {
+        const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+          headers: {
+            'xi-api-key': apiKey
+          }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch voices');
+        
+        const data = await response.json();
+        // Filter for voices that support Japanese using 'ja' code
+        const japaneseVoiceList = data.voices.filter(voice => 
+          voice.labels && voice.labels.language === 'ja'
+        );
+        
+        setJapaneseVoices(japaneseVoiceList);
+        
+        // Set default voice if none selected
+        if (!localStorage.getItem('elevenLabsVoiceId')) {
+          // Use first Japanese voice, or first available voice if no Japanese voices
+          const defaultVoice = japaneseVoiceList.length > 0 
+            ? japaneseVoiceList[0].voice_id 
+            : data.voices[0]?.voice_id;
+            
+          if (defaultVoice) {
+            setSelectedVoiceId(defaultVoice);
+            localStorage.setItem('elevenLabsVoiceId', defaultVoice);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching voices:', error);
+      }
+    };
+
+    fetchVoices();
+  }, [apiKey]);
+
   const handleTileClick = (tile) => {
+    if (tile && tile.content) {
+      speak(tile.content);
+    } else {
+      console.error('Invalid tile data:', tile);
+    }
     if (selectedTiles.length === 2 || selectedTiles.includes(tile) || matchedPairs.includes(tile.id)) {
       return;
     }
-
-    speak(tile.content);
 
     const newSelected = [...selectedTiles, tile];
     setSelectedTiles(newSelected);
@@ -268,6 +316,45 @@ const HiraganaLearningGame = () => {
           Congratulations! You won in {moves} moves!
         </div>
       )}
+
+      <div style={{
+        marginBottom: '20px',
+        padding: '10px',
+        backgroundColor: '#f3f4f6',
+        borderRadius: '8px'
+      }}>
+        <label 
+          htmlFor="voice-select" 
+          style={{
+            marginRight: '10px',
+            fontWeight: '500'
+          }}
+        >
+          Voice:
+        </label>
+        <select
+          id="voice-select"
+          value={selectedVoiceId}
+          onChange={(e) => {
+            setSelectedVoiceId(e.target.value);
+            localStorage.setItem('elevenLabsVoiceId', e.target.value);
+          }}
+          style={{
+            padding: '8px',
+            borderRadius: '6px',
+            border: '1px solid #d1d5db',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            minWidth: '200px'
+          }}
+        >
+          {japaneseVoices.map((voice) => (
+            <option key={voice.voice_id} value={voice.voice_id}>
+              {voice.name}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 };
